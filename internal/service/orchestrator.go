@@ -7,7 +7,9 @@ import (
 
 	"csv-h3-tool/internal/config"
 	"csv-h3-tool/internal/csv"
+	"csv-h3-tool/internal/errors"
 	"csv-h3-tool/internal/h3"
+	"csv-h3-tool/internal/logging"
 	"csv-h3-tool/internal/validator"
 )
 
@@ -17,6 +19,7 @@ type Orchestrator struct {
 	h3Generator h3.Generator
 	processor   csv.Processor
 	config      *config.Config
+	logger      *logging.Logger
 }
 
 // h3GeneratorAdapter adapts the h3.Generator interface to work with csv.StreamingProcessor
@@ -32,6 +35,8 @@ func (a *h3GeneratorAdapter) Generate(lat, lng float64, resolution int) (string,
 func NewOrchestrator(cfg *config.Config) *Orchestrator {
 	validator := validator.NewCoordinateValidator()
 	h3Generator := h3.NewH3Generator()
+	logger := logging.NewDefaultLogger(cfg.Verbose)
+	
 	processor := csv.NewStreamingProcessor(validator, &h3GeneratorAdapter{
 		generator: h3Generator,
 	})
@@ -41,6 +46,7 @@ func NewOrchestrator(cfg *config.Config) *Orchestrator {
 		h3Generator: h3Generator,
 		processor:   processor,
 		config:      cfg,
+		logger:      logger,
 	}
 }
 
@@ -57,37 +63,38 @@ type ProcessResult struct {
 func (o *Orchestrator) ProcessFile() (*ProcessResult, error) {
 	startTime := time.Now()
 
-	if o.config.Verbose {
-		fmt.Printf("Starting CSV processing...\n")
-		fmt.Printf("Input file: %s\n", o.config.InputFile)
-		fmt.Printf("Output file: %s\n", o.config.OutputFile)
-		fmt.Printf("H3 Resolution: %d (%s)\n", o.config.Resolution, o.config.GetResolutionDescription())
-	}
+	o.logger.Info("Starting CSV processing")
+	o.logger.Info("Input file: %s", o.config.InputFile)
+	o.logger.Info("Output file: %s", o.config.OutputFile)
+	o.logger.Info("H3 Resolution: %d (%s)", o.config.Resolution, o.config.GetResolutionDescription())
 
 	// Validate configuration
 	if err := o.config.Validate(); err != nil {
-		return nil, fmt.Errorf("configuration validation failed: %w", err)
+		configErr := errors.NewConfigError("", "", "configuration validation failed", err)
+		o.logger.LogError(configErr)
+		return nil, configErr
 	}
 
 	// Pre-validate CSV structure
 	if err := o.validateCSVStructure(); err != nil {
-		return nil, fmt.Errorf("CSV structure validation failed: %w", err)
+		csvErr := errors.NewCSVError(o.config.InputFile, 0, 0, "", "", "CSV structure validation failed", err)
+		o.logger.LogError(csvErr)
+		return nil, csvErr
 	}
 
 	// Process the file with progress reporting
 	result, err := o.processWithProgress()
 	if err != nil {
-		return nil, fmt.Errorf("file processing failed: %w", err)
+		processErr := errors.NewProcessingError("file_processing", 0, "file processing failed", err)
+		o.logger.LogError(processErr)
+		return nil, processErr
 	}
 
 	result.ProcessingTime = time.Since(startTime)
 	result.OutputFile = o.config.OutputFile
 
-	if o.config.Verbose {
-		fmt.Printf("Processing completed in %v\n", result.ProcessingTime)
-		fmt.Printf("Results: %d total, %d valid, %d invalid records\n", 
-			result.TotalRecords, result.ValidRecords, result.InvalidRecords)
-	}
+	// Log processing summary
+	o.logger.LogProcessingSummary(result.TotalRecords, result.ValidRecords, result.InvalidRecords, result.ProcessingTime)
 
 	return result, nil
 }
@@ -102,7 +109,7 @@ func (o *Orchestrator) validateCSVStructure() error {
 		HasHeaders: o.config.HasHeaders,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to open CSV file for validation: %w", err)
+		return errors.NewFileError(o.config.InputFile, "open", err)
 	}
 	defer reader.Close()
 
@@ -113,16 +120,14 @@ func (o *Orchestrator) validateCSVStructure() error {
 		LngColumn:  o.config.LngColumn,
 		HasHeaders: o.config.HasHeaders,
 	}); err != nil {
-		return fmt.Errorf("column validation failed: %w", err)
+		return errors.NewValidationError("columns", "", 0, "column validation failed", err)
 	}
 
-	if o.config.Verbose {
-		fmt.Printf("CSV structure validated successfully\n")
-		if o.config.HasHeaders {
-			fmt.Printf("Headers: %v\n", headers)
-			fmt.Printf("Latitude column: %s (index %d)\n", o.config.LatColumn, reader.GetLatIndex())
-			fmt.Printf("Longitude column: %s (index %d)\n", o.config.LngColumn, reader.GetLngIndex())
-		}
+	o.logger.Info("CSV structure validated successfully")
+	if o.config.HasHeaders {
+		o.logger.Debug("Headers: %v", headers)
+		o.logger.Debug("Latitude column: %s (index %d)", o.config.LatColumn, reader.GetLatIndex())
+		o.logger.Debug("Longitude column: %s (index %d)", o.config.LngColumn, reader.GetLngIndex())
 	}
 
 	return nil
@@ -130,15 +135,11 @@ func (o *Orchestrator) validateCSVStructure() error {
 
 // processWithProgress processes the CSV file with progress reporting
 func (o *Orchestrator) processWithProgress() (*ProcessResult, error) {
-	// Get file size for progress calculation
-	fileInfo, err := os.Stat(o.config.InputFile)
+	// Get file info for validation
+	_, err := os.Stat(o.config.InputFile)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get file info: %w", err)
+		return nil, errors.NewFileError(o.config.InputFile, "stat", err)
 	}
-	fileSize := fileInfo.Size()
-
-	// Create progress reporter
-	progressReporter := NewProgressReporter(fileSize, o.config.Verbose)
 
 	// Open input file
 	reader, err := csv.NewReader(o.config.InputFile, csv.Config{
@@ -148,7 +149,7 @@ func (o *Orchestrator) processWithProgress() (*ProcessResult, error) {
 		HasHeaders: o.config.HasHeaders,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to open input file: %w", err)
+		return nil, errors.NewFileError(o.config.InputFile, "open", err)
 	}
 	defer reader.Close()
 
@@ -159,50 +160,81 @@ func (o *Orchestrator) processWithProgress() (*ProcessResult, error) {
 		Overwrite:  o.config.Overwrite,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to create output file: %w", err)
+		return nil, errors.NewFileError(o.config.OutputFile, "create", err)
 	}
 	defer writer.Close()
 
+	// Create processing logger
+	processLogger := logging.NewProcessingLogger(o.logger, o.config.InputFile, 0)
+
 	// Process records with progress tracking
 	result := &ProcessResult{}
+	errorCollector := errors.NewErrorCollector(100) // Collect up to 100 errors
 	
 	// Create streaming processor with our components
 	streamProcessor := csv.NewStreamingProcessor(o.validator, &h3GeneratorAdapter{
 		generator: o.h3Generator,
 	})
 
-	// Process the stream with progress reporting
+	// Process the stream with enhanced error handling
 	err = streamProcessor.ProcessStream(reader, csv.Config{
 		InputFile:  o.config.InputFile,
 		OutputFile: o.config.OutputFile,
 		Resolution: o.config.Resolution,
 		Verbose:    o.config.Verbose,
 	}, func(record *csv.Record) error {
-		// Update progress
-		progressReporter.UpdateProgress(record.LineNumber)
-		
 		// Update counters
 		result.TotalRecords++
+		
 		if record.IsValid {
 			result.ValidRecords++
+			processLogger.LogRecordProcessed(record.LineNumber, true, record.H3Index)
 		} else {
 			result.InvalidRecords++
+			processLogger.LogRecordProcessed(record.LineNumber, false, "")
+			
+			// Log specific error details if available
+			if record.Latitude != 0 || record.Longitude != 0 {
+				processLogger.LogCoordinateError(record.LineNumber, record.Latitude, record.Longitude, 
+					"coordinates", "invalid coordinate values")
+			} else {
+				processLogger.LogSkippedRecord(record.LineNumber, "empty or malformed coordinates")
+			}
 		}
 
 		// Write record to output
-		return writer.WriteRecord(record)
+		if err := writer.WriteRecord(record); err != nil {
+			writeErr := errors.NewFileError(o.config.OutputFile, "write", err)
+			errorCollector.Add(writeErr)
+			o.logger.LogError(writeErr)
+			return writeErr
+		}
+		
+		return nil
 	})
 
 	if err != nil {
-		return nil, fmt.Errorf("stream processing failed: %w", err)
+		return nil, errors.NewProcessingError("stream_processing", 0, "stream processing failed", err)
 	}
 
 	// Ensure all data is written
 	if err := writer.Flush(); err != nil {
-		return nil, fmt.Errorf("failed to flush output: %w", err)
+		return nil, errors.NewFileError(o.config.OutputFile, "flush", err)
 	}
 
-	progressReporter.Complete()
+	// Log completion
+	processLogger.Complete(time.Since(time.Now()), result.ValidRecords, result.InvalidRecords)
+
+	// Report collected errors if any
+	if errorCollector.HasErrors() {
+		o.logger.Warn("Processing completed with %d errors", errorCollector.Count())
+		if o.config.Verbose {
+			for _, err := range errorCollector.Errors() {
+				o.logger.LogError(err)
+			}
+		}
+	}
+
 	return result, nil
 }
 
@@ -252,19 +284,23 @@ func (p *ProgressReporter) Complete() {
 // ValidateComponents ensures all required components are properly initialized
 func (o *Orchestrator) ValidateComponents() error {
 	if o.validator == nil {
-		return fmt.Errorf("validator component is not initialized")
+		return errors.NewValidationError("validator", "", 0, "validator component is not initialized", nil)
 	}
 	
 	if o.h3Generator == nil {
-		return fmt.Errorf("H3 generator component is not initialized")
+		return errors.NewValidationError("h3Generator", "", 0, "H3 generator component is not initialized", nil)
 	}
 	
 	if o.processor == nil {
-		return fmt.Errorf("CSV processor component is not initialized")
+		return errors.NewValidationError("processor", "", 0, "CSV processor component is not initialized", nil)
 	}
 	
 	if o.config == nil {
-		return fmt.Errorf("configuration is not initialized")
+		return errors.NewValidationError("config", "", 0, "configuration is not initialized", nil)
+	}
+	
+	if o.logger == nil {
+		return errors.NewValidationError("logger", "", 0, "logger component is not initialized", nil)
 	}
 	
 	return nil

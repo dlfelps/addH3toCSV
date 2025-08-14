@@ -67,13 +67,18 @@ func (c *CLI) setupFlags() {
 	// CSV options
 	flags.BoolVar(&c.config.HasHeaders, "headers", true, 
 		"CSV file has header row")
-	flags.BoolVar(&c.config.HasHeaders, "no-headers", false, 
-		"CSV file does not have header row")
+	
+	// We'll handle no-headers in PreRunE since it needs to override the default
 	
 	// Delimiter option (string that gets converted to rune)
 	var delimiterStr string
 	flags.StringVar(&delimiterStr, "delimiter", ",", 
 		"CSV delimiter character (default: comma)")
+	
+	// No-headers flag (handled separately)
+	var noHeaders bool
+	flags.BoolVar(&noHeaders, "no-headers", false, 
+		"CSV file does not have header row")
 	
 	// File handling
 	flags.BoolVar(&c.config.Overwrite, "overwrite", false, 
@@ -94,7 +99,7 @@ func (c *CLI) setupFlags() {
 		}
 		
 		// Handle no-headers flag
-		if cmd.Flags().Changed("no-headers") {
+		if cmd.Flags().Changed("no-headers") && noHeaders {
 			c.config.HasHeaders = false
 		}
 		
