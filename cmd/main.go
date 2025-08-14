@@ -3,10 +3,18 @@ package main
 import (
 	"fmt"
 	"os"
+
+	"csv-h3-tool/internal/cli"
 )
 
 func main() {
-	// Main entry point - will be implemented in later tasks
-	fmt.Println("CSV H3 Tool")
-	os.Exit(0)
+	// Create CLI instance
+	cliApp := cli.NewCLI()
+	cliApp.AddHelpCommand()
+
+	// Execute the CLI application
+	if err := cliApp.Execute(); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
 }

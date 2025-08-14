@@ -8,6 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"csv-h3-tool/internal/config"
+	"csv-h3-tool/internal/service"
 )
 
 // CLI represents the command line interface
@@ -117,13 +118,8 @@ func (c *CLI) run(cmd *cobra.Command, args []string) error {
 		fmt.Printf("H3 Resolution: %s\n", c.config.GetResolutionDescription())
 	}
 	
-	// TODO: This will be implemented in task 6 - integrate components
-	fmt.Printf("Processing CSV file: %s\n", c.config.InputFile)
-	fmt.Printf("Output file: %s\n", c.config.OutputFile)
-	fmt.Printf("H3 Resolution: %d (%s)\n", c.config.Resolution, c.config.GetResolutionDescription())
-	fmt.Println("Processing will be implemented in the next task...")
-	
-	return nil
+	// Process the file using the orchestrator
+	return c.processFile()
 }
 
 // Execute runs the CLI application
@@ -246,4 +242,36 @@ func ParseDelimiter(delimStr string) (rune, error) {
 	}
 	
 	return rune(delimStr[0]), nil
+}
+
+// processFile processes the CSV file using the orchestrator
+func (c *CLI) processFile() error {
+	// Create orchestrator with the configuration
+	orchestrator := service.NewOrchestrator(c.config)
+
+	// Validate all components are properly wired
+	if err := orchestrator.ValidateComponents(); err != nil {
+		return fmt.Errorf("component validation failed: %w", err)
+	}
+
+	// Process the file
+	result, err := orchestrator.ProcessFile()
+	if err != nil {
+		return fmt.Errorf("file processing failed: %w", err)
+	}
+
+	// Display results
+	fmt.Printf("Processing completed successfully!\n")
+	fmt.Printf("Output file: %s\n", result.OutputFile)
+	fmt.Printf("Total records: %d\n", result.TotalRecords)
+	fmt.Printf("Valid records: %d\n", result.ValidRecords)
+	fmt.Printf("Invalid records: %d\n", result.InvalidRecords)
+	fmt.Printf("Processing time: %v\n", result.ProcessingTime)
+
+	if result.InvalidRecords > 0 {
+		fmt.Printf("\nWarning: %d records were skipped due to invalid coordinates.\n", result.InvalidRecords)
+		fmt.Printf("Use --verbose flag to see detailed error messages.\n")
+	}
+
+	return nil
 }
