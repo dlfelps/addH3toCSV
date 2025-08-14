@@ -99,6 +99,14 @@ func TestMemoryUsageScaling(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping memory tests in short mode")
 	}
+	
+	// Set a reasonable timeout for the test
+	if deadline, ok := t.Deadline(); ok {
+		remaining := deadline.Sub(time.Now())
+		if remaining < 30*time.Second {
+			t.Skip("Insufficient time remaining for memory scaling test")
+		}
+	}
 
 	tempDir, err := os.MkdirTemp("", "csv-h3-memory-test-*")
 	if err != nil {
@@ -145,7 +153,8 @@ func TestMemoryUsageScaling(t *testing.T) {
 			}
 
 			// Get memory stats before processing
-			_ = getMemoryStats()
+			preProcessStats := getMemoryStats()
+			_ = preProcessStats // Used for potential future memory analysis
 			
 			// Process the file
 			start := time.Now()

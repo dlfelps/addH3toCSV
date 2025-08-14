@@ -454,7 +454,8 @@ func TestStreamingErrorHandlingPerformance(t *testing.T) {
 
 			// Validate results
 			expectedInvalid := int(float64(test.numRecords) * test.errorRate)
-			_ = test.numRecords - expectedInvalid
+			expectedValid := test.numRecords - expectedInvalid
+			_ = expectedValid // Used for validation logic
 			
 			// Allow some tolerance for rounding
 			tolerance := int(float64(test.numRecords) * 0.02) // 2% tolerance

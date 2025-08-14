@@ -1,0 +1,52 @@
+name: Test Visualization
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test-with-visualization:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+    
+    - name: Install gotestsum
+      run: go install gotest.tools/gotestsum@latest
+    
+    - name: Run tests with beautiful output
+      run: |
+        gotestsum --format testname --junitfile tests.xml ./...
+    
+    - name: Generate test dashboard
+      run: |
+        chmod +x scripts/run-dashboard.sh
+        ./scripts/run-dashboard.sh
+    
+    - name: Generate HTML report
+      run: go run scripts/generate-test-report.go
+    
+    - name: Upload test results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: test-results
+        path: |
+          tests.xml
+          test-report.html
+          coverage.out
+    
+    - name: Publish test results
+      uses: dorny/test-reporter@v1
+      if: always()
+      with:
+        name: Go Tests
+        path: tests.xml
+        reporter: java-junit

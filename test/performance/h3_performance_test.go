@@ -17,13 +17,14 @@ type CoordinatePair struct {
 
 // generateTestCoordinates generates test coordinates for benchmarking
 func generateTestCoordinates(count int) []CoordinatePair {
-	rand.Seed(time.Now().UnixNano())
+	// Use the new random source (Go 1.20+)
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	coords := make([]CoordinatePair, count)
 	
 	for i := 0; i < count; i++ {
 		// Generate realistic coordinates covering the globe
-		lat := (rand.Float64() * 180) - 90   // -90 to 90
-		lng := (rand.Float64() * 360) - 180  // -180 to 180
+		lat := (r.Float64() * 180) - 90   // -90 to 90
+		lng := (r.Float64() * 360) - 180  // -180 to 180
 		coords[i] = CoordinatePair{Lat: lat, Lng: lng}
 	}
 	

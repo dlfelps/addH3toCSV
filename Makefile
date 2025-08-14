@@ -73,6 +73,20 @@ test-all:
 	@echo "Running all tests with coverage..."
 	go test -v -race -coverprofile=coverage.out ./...
 
+# Test visualization
+test-dashboard:
+	@echo "Generating test dashboard..."
+	@chmod +x scripts/run-dashboard.sh
+	@./scripts/run-dashboard.sh
+
+test-report:
+	@echo "Generating HTML test report..."
+	go run scripts/generate-test-report.go
+
+test-watch:
+	@echo "Watching tests (requires entr)..."
+	find . -name "*.go" | entr -c make test-short
+
 # Benchmark commands
 bench:
 	@echo "Running benchmarks..."
