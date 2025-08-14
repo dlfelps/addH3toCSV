@@ -1,0 +1,50 @@
+{
+  "binary_name": "csv-h3-tool",
+  "cmd_path": "./cmd",
+  "dist_dir": "dist",
+  "platforms": {
+    "linux/amd64": {
+      "output": "linux-amd64",
+      "supported": true,
+      "package_format": "tar.gz"
+    },
+    "linux/arm64": {
+      "output": "linux-arm64",
+      "supported": true,
+      "package_format": "tar.gz"
+    },
+    "windows/amd64": {
+      "output": "windows-amd64.exe",
+      "supported": true,
+      "package_format": "zip"
+    },
+    "windows/arm64": {
+      "output": "windows-arm64.exe",
+      "supported": false,
+      "reason": "H3 library does not support Windows ARM64",
+      "package_format": "zip"
+    },
+    "darwin/amd64": {
+      "output": "darwin-amd64",
+      "supported": true,
+      "package_format": "tar.gz"
+    },
+    "darwin/arm64": {
+      "output": "darwin-arm64",
+      "supported": true,
+      "package_format": "tar.gz"
+    },
+    "freebsd/amd64": {
+      "output": "freebsd-amd64",
+      "supported": true,
+      "package_format": "tar.gz"
+    }
+  },
+  "build_flags": {
+    "ldflags_template": "-X main.Version={{.Version}} -X main.BuildTime={{.BuildTime}} -X main.GitCommit={{.GitCommit}}",
+    "race_detection": {
+      "enabled_for": ["linux", "darwin", "freebsd"],
+      "disabled_for": ["windows"]
+    }
+  }
+}

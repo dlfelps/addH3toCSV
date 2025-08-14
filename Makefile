@@ -10,8 +10,16 @@ help:
 	@echo ""
 	@echo "Build Commands:"
 	@echo "  build          Build the application"
+	@echo "  build-dev      Build with race detection (development)"
 	@echo "  install        Install the application"
 	@echo "  clean          Clean build artifacts"
+	@echo ""
+	@echo "Release Commands:"
+	@echo "  release        Build complete release (binaries + packages + checksums)"
+	@echo "  release-build  Build release binaries for all platforms"
+	@echo "  release-package Create release packages (tar.gz, zip)"
+	@echo "  release-checksums Generate SHA256 checksums"
+	@echo "  release-clean  Clean release artifacts"
 	@echo ""
 	@echo "Test Commands:"
 	@echo "  test           Run all tests"
@@ -36,7 +44,11 @@ help:
 # Build commands
 build:
 	@echo "Building CSV H3 Tool..."
-	go build -o csv-h3-tool ./cmd
+	go build -ldflags "$(LDFLAGS)" -o csv-h3-tool ./cmd
+
+build-dev:
+	@echo "Building CSV H3 Tool (development)..."
+	go build -race -o csv-h3-tool-dev ./cmd
 
 install:
 	@echo "Installing CSV H3 Tool..."
@@ -46,9 +58,11 @@ clean:
 	@echo "Cleaning build artifacts..."
 	rm -f csv-h3-tool
 	rm -f csv-h3-tool.exe
+	rm -f csv-h3-tool-dev
 	rm -f coverage.out
 	rm -f coverage.html
 	rm -rf test/tmp/
+	rm -rf dist/
 
 # Test commands
 test: test-unit test-integration test-performance
@@ -198,12 +212,54 @@ docker-test:
 	docker run --rm csv-h3-tool make test
 
 # Release targets
+VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
+BUILD_TIME := $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
+GIT_COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+LDFLAGS := -X main.Version=$(VERSION) -X main.BuildTime=$(BUILD_TIME) -X main.GitCommit=$(GIT_COMMIT)
+
 release-build:
-	@echo "Building release binaries..."
-	GOOS=linux GOARCH=amd64 go build -o csv-h3-tool-linux-amd64 ./cmd
-	GOOS=windows GOARCH=amd64 go build -o csv-h3-tool-windows-amd64.exe ./cmd
-	GOOS=darwin GOARCH=amd64 go build -o csv-h3-tool-darwin-amd64 ./cmd
-	GOOS=darwin GOARCH=arm64 go build -o csv-h3-tool-darwin-arm64 ./cmd
+	@echo "Building release binaries for version $(VERSION)..."
+	@mkdir -p dist
+	@echo "Building Linux AMD64..."
+	@GOOS=linux GOARCH=amd64 go build -ldflags "$(LDFLAGS)" -o dist/csv-h3-tool-linux-amd64 ./cmd
+	@echo "Building Linux ARM64..."
+	@GOOS=linux GOARCH=arm64 go build -ldflags "$(LDFLAGS)" -o dist/csv-h3-tool-linux-arm64 ./cmd
+	@echo "Building Windows AMD64..."
+	@GOOS=windows GOARCH=amd64 go build -ldflags "$(LDFLAGS)" -o dist/csv-h3-tool-windows-amd64.exe ./cmd
+	@echo "Skipping Windows ARM64 (H3 library not supported)"
+	@echo "Building macOS AMD64..."
+	@GOOS=darwin GOARCH=amd64 go build -ldflags "$(LDFLAGS)" -o dist/csv-h3-tool-darwin-amd64 ./cmd
+	@echo "Building macOS ARM64..."
+	@GOOS=darwin GOARCH=arm64 go build -ldflags "$(LDFLAGS)" -o dist/csv-h3-tool-darwin-arm64 ./cmd
+	@echo "Building FreeBSD AMD64..."
+	@GOOS=freebsd GOARCH=amd64 go build -ldflags "$(LDFLAGS)" -o dist/csv-h3-tool-freebsd-amd64 ./cmd
+	@echo "Release binaries built in dist/ directory"
+
+release-package:
+	@echo "Creating release packages..."
+	@mkdir -p dist/packages
+	cd dist && tar -czf packages/csv-h3-tool-$(VERSION)-linux-amd64.tar.gz csv-h3-tool-linux-amd64
+	cd dist && tar -czf packages/csv-h3-tool-$(VERSION)-linux-arm64.tar.gz csv-h3-tool-linux-arm64
+	cd dist && zip -q packages/csv-h3-tool-$(VERSION)-windows-amd64.zip csv-h3-tool-windows-amd64.exe
+	cd dist && zip -q packages/csv-h3-tool-$(VERSION)-windows-arm64.zip csv-h3-tool-windows-arm64.exe
+	cd dist && tar -czf packages/csv-h3-tool-$(VERSION)-darwin-amd64.tar.gz csv-h3-tool-darwin-amd64
+	cd dist && tar -czf packages/csv-h3-tool-$(VERSION)-darwin-arm64.tar.gz csv-h3-tool-darwin-arm64
+	cd dist && tar -czf packages/csv-h3-tool-$(VERSION)-freebsd-amd64.tar.gz csv-h3-tool-freebsd-amd64
+	@echo "Release packages created in dist/packages/ directory"
+
+release-checksums:
+	@echo "Generating checksums..."
+	cd dist/packages && sha256sum *.tar.gz *.zip > checksums.txt
+	@echo "Checksums generated in dist/packages/checksums.txt"
+
+release: release-build release-package release-checksums
+	@echo "Full release build completed for version $(VERSION)"
+	@echo "Files available in dist/packages/"
+	@ls -la dist/packages/
+
+release-clean:
+	@echo "Cleaning release artifacts..."
+	rm -rf dist/
 
 # Documentation
 docs:

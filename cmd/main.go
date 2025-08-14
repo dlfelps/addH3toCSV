@@ -7,9 +7,17 @@ import (
 	"csv-h3-tool/internal/cli"
 )
 
+// Version information (set by build flags)
+var (
+	Version   = "dev"
+	BuildTime = "unknown"
+	GitCommit = "unknown"
+)
+
 func main() {
-	// Create CLI instance
+	// Create CLI instance with version information
 	cliApp := cli.NewCLI()
+	cliApp.SetVersionInfo(Version, BuildTime, GitCommit)
 	cliApp.AddHelpCommand()
 
 	// Execute the CLI application

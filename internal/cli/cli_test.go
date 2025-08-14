@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -355,7 +356,7 @@ func TestCLI_HelpOutput(t *testing.T) {
 		"latitude",
 		"longitude",
 		"resolution",
-		"Examples:",
+		"BASIC USAGE:",
 	}
 	
 	for _, expected := range expectedSubstrings {
@@ -386,24 +387,192 @@ func TestCLI_ResolutionHelp(t *testing.T) {
 	}
 	
 	// Read captured output
-	buf := make([]byte, 4096)
+	buf := make([]byte, 8192)
 	n, _ := r.Read(buf)
 	output := string(buf[:n])
 	r.Close()
 	
 	// Check that resolution help contains key information
 	expectedSubstrings := []string{
-		"H3 Resolution Levels",
-		"Country level",
-		"Street level",
-		"default",
-		"precision",
+		"H3 Resolution Levels and Use Cases",
+		"hierarchical hexagonal grid",
+		"Country level (~1107.71 km)",
+		"Street level (~461.35 m)",
+		"DEFAULT",
+		"SELECTION GUIDELINES",
+		"HIERARCHICAL RELATIONSHIPS",
+		"parent-child relationships",
+		"EXAMPLES:",
 	}
 	
 	for _, expected := range expectedSubstrings {
 		if !strings.Contains(output, expected) {
-			t.Errorf("Expected resolution help to contain %s, got output: %s", expected, output)
+			t.Errorf("Expected resolution help to contain %s", expected)
 		}
+	}
+	
+	// Check that all resolution levels 0-15 are present
+	for i := 0; i <= 15; i++ {
+		if !strings.Contains(output, fmt.Sprintf("%-4d", i)) {
+			t.Errorf("Expected resolution help to contain level %d", i)
+		}
+	}
+}
+
+func TestCLI_ExamplesHelp(t *testing.T) {
+	cli := NewCLI()
+	cli.AddHelpCommand()
+	
+	// Test examples help command by capturing stdout
+	oldStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+	
+	cli.rootCmd.SetArgs([]string{"examples"})
+	err := cli.rootCmd.Execute()
+	
+	// Restore stdout
+	w.Close()
+	os.Stdout = oldStdout
+	
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	
+	// Read captured output
+	buf := make([]byte, 8192)
+	n, _ := r.Read(buf)
+	output := string(buf[:n])
+	r.Close()
+	
+	// Check that examples help contains key information
+	expectedSubstrings := []string{
+		"CSV H3 Tool - Usage Examples",
+		"Basic Usage",
+		"Custom Output File",
+		"Different Resolution",
+		"Custom Column Names",
+		"No Header Row",
+		"Different Delimiter",
+		"Tab-Separated Values",
+		"Large File Processing",
+		"COMMON CSV FORMATS:",
+		"Standard format with headers:",
+		"Alternative column names:",
+		"No headers (use column indices):",
+		"European format (semicolon delimiter):",
+		"OUTPUT FORMAT:",
+		"h3_index",
+	}
+	
+	for _, expected := range expectedSubstrings {
+		if !strings.Contains(output, expected) {
+			t.Errorf("Expected examples help to contain %s", expected)
+		}
+	}
+	
+	// Check that practical commands are included
+	expectedCommands := []string{
+		"csv-h3-tool locations.csv",
+		"csv-h3-tool input.csv -o processed_locations.csv",
+		"csv-h3-tool properties.csv -r 10",
+		"--lat-column",
+		"--lng-column",
+		"--no-headers",
+		"--delimiter",
+	}
+	
+	for _, expected := range expectedCommands {
+		if !strings.Contains(output, expected) {
+			t.Errorf("Expected examples help to contain command %s", expected)
+		}
+	}
+}
+
+func TestCLI_HelpCompleteness(t *testing.T) {
+	cli := NewCLI()
+	cli.AddHelpCommand()
+	
+	// Test main help
+	cli.rootCmd.SetArgs([]string{"--help"})
+	
+	// Capture output
+	var buf bytes.Buffer
+	cli.rootCmd.SetOut(&buf)
+	
+	err := cli.rootCmd.Execute()
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	
+	output := buf.String()
+	
+	// Check comprehensive help content
+	expectedSections := []string{
+		"H3 is a hierarchical geospatial indexing system",
+		"BASIC USAGE:",
+		"COLUMN CONFIGURATION:",
+		"CSV FORMAT OPTIONS:",
+		"ADVANCED USAGE:",
+		"RESOLUTION LEVELS:",
+		"OUTPUT FORMAT:",
+		"Available Commands:",
+		"examples",
+		"resolutions",
+	}
+	
+	for _, expected := range expectedSections {
+		if !strings.Contains(output, expected) {
+			t.Errorf("Expected main help to contain section %s", expected)
+		}
+	}
+	
+	// Check that all flags are documented with enhanced descriptions
+	expectedFlags := []string{
+		"Name or index of the latitude column",
+		"Name or index of the longitude column", 
+		"H3 resolution level (0-15). Higher = more precise",
+		"CSV delimiter character. Use '\\t' for tab",
+		"Force processing without header row",
+		"Overwrite output file if it already exists",
+		"Enable verbose output with processing details",
+	}
+	
+	for _, expected := range expectedFlags {
+		if !strings.Contains(output, expected) {
+			t.Errorf("Expected main help to contain flag description %s", expected)
+		}
+	}
+}
+
+func TestCLI_HelpCommands(t *testing.T) {
+	cli := NewCLI()
+	cli.AddHelpCommand()
+	
+	// Test that help commands are properly registered
+	commands := cli.rootCmd.Commands()
+	
+	var foundResolutions, foundExamples bool
+	for _, cmd := range commands {
+		if cmd.Use == "resolutions" {
+			foundResolutions = true
+			if cmd.Short != "Show H3 resolution levels and their descriptions" {
+				t.Errorf("Unexpected resolutions command description: %s", cmd.Short)
+			}
+		}
+		if cmd.Use == "examples" {
+			foundExamples = true
+			if cmd.Short != "Show common usage examples and patterns" {
+				t.Errorf("Unexpected examples command description: %s", cmd.Short)
+			}
+		}
+	}
+	
+	if !foundResolutions {
+		t.Error("Expected resolutions command to be registered")
+	}
+	if !foundExamples {
+		t.Error("Expected examples command to be registered")
 	}
 }
 
