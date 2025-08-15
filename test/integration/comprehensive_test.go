@@ -1,6 +1,7 @@
 package integration
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -43,7 +44,10 @@ func TestComprehensiveScenarios(t *testing.T) {
 					{"Moscow", "Russia", "55.7558", "37.6176", "12506468"},
 				}
 				
-				inputFile, _ := runner.CreateTestFile("real_cities", headers, records)
+				inputFile, err := runner.CreateTestFile("real_cities", headers, records)
+				if err != nil {
+					panic(fmt.Sprintf("Failed to create test file: %v", err))
+				}
 				cfg := &config.Config{
 					InputFile:  inputFile,
 					OutputFile: filepath.Join(tempDir, "real_cities_output.csv"),
@@ -80,7 +84,10 @@ func TestComprehensiveScenarios(t *testing.T) {
 					{"10", "48.8566", "2.3522", "valid"},
 				}
 				
-				inputFile, _ := runner.CreateTestFile("mixed_data", headers, records)
+				inputFile, err := runner.CreateTestFile("mixed_data", headers, records)
+				if err != nil {
+					panic(fmt.Sprintf("Failed to create test file: %v", err))
+				}
 				cfg := &config.Config{
 					InputFile:  inputFile,
 					OutputFile: filepath.Join(tempDir, "mixed_data_output.csv"),
@@ -119,7 +126,10 @@ func TestComprehensiveScenarios(t *testing.T) {
 					{"Max West", "45.0", "-179.999", "boundary"},
 				}
 				
-				inputFile, _ := runner.CreateTestFile("boundaries", headers, records)
+				inputFile, err := runner.CreateTestFile("boundaries", headers, records)
+				if err != nil {
+					panic(fmt.Sprintf("Failed to create test file: %v", err))
+				}
 				cfg := &config.Config{
 					InputFile:  inputFile,
 					OutputFile: filepath.Join(tempDir, "boundaries_output.csv"),
@@ -153,7 +163,10 @@ func TestComprehensiveScenarios(t *testing.T) {
 					{"Leading Zeros", "040.7128", "-074.0060", "leading_zeros"},
 				}
 				
-				inputFile, _ := runner.CreateTestFile("precision", headers, records)
+				inputFile, err := runner.CreateTestFile("precision", headers, records)
+				if err != nil {
+					panic(fmt.Sprintf("Failed to create test file: %v", err))
+				}
 				cfg := &config.Config{
 					InputFile:  inputFile,
 					OutputFile: filepath.Join(tempDir, "precision_output.csv"),
@@ -183,7 +196,10 @@ func TestComprehensiveScenarios(t *testing.T) {
 					{"48.8566", "2.3522", "Paris", "France"},
 				}
 				
-				inputFile, _ := runner.CreateTestFile("no_headers", nil, records)
+				inputFile, err := runner.CreateTestFile("no_headers", nil, records)
+				if err != nil {
+					panic(fmt.Sprintf("Failed to create test file: %v", err))
+				}
 				cfg := &config.Config{
 					InputFile:  inputFile,
 					OutputFile: filepath.Join(tempDir, "no_headers_output.csv"),
@@ -214,7 +230,10 @@ func TestComprehensiveScenarios(t *testing.T) {
 					{"LOC004", "-33.8688", "151.2093", "Sydney", "AU"},
 				}
 				
-				inputFile, _ := runner.CreateTestFile("custom_columns", headers, records)
+				inputFile, err := runner.CreateTestFile("custom_columns", headers, records)
+				if err != nil {
+					panic(fmt.Sprintf("Failed to create test file: %v", err))
+				}
 				cfg := &config.Config{
 					InputFile:  inputFile,
 					OutputFile: filepath.Join(tempDir, "custom_columns_output.csv"),
@@ -242,7 +261,10 @@ func TestComprehensiveScenarios(t *testing.T) {
 					{"Test Location", "40.7128", "-74.0060"},
 				}
 				
-				inputFile, _ := runner.CreateTestFile("resolution_test", headers, records)
+				inputFile, err := runner.CreateTestFile("resolution_test", headers, records)
+				if err != nil {
+					panic(fmt.Sprintf("Failed to create test file: %v", err))
+				}
 				cfg := &config.Config{
 					InputFile:  inputFile,
 					OutputFile: filepath.Join(tempDir, "resolution_test_output.csv"),
@@ -274,7 +296,10 @@ func TestComprehensiveScenarios(t *testing.T) {
 					{"Mixed Whitespace", " \t40.7128 \t", " \t-74.0060 \t"},
 				}
 				
-				inputFile, _ := runner.CreateTestFile("whitespace", headers, records)
+				inputFile, err := runner.CreateTestFile("whitespace", headers, records)
+				if err != nil {
+					panic(fmt.Sprintf("Failed to create test file: %v", err))
+				}
 				cfg := &config.Config{
 					InputFile:  inputFile,
 					OutputFile: filepath.Join(tempDir, "whitespace_output.csv"),
@@ -300,7 +325,12 @@ func TestComprehensiveScenarios(t *testing.T) {
 		t.Run(scenario.name, func(t *testing.T) {
 			start := time.Now()
 			
-			_, cfg, expectedTotal, expectedValid := scenario.setupFunc()
+			inputFile, cfg, expectedTotal, expectedValid := scenario.setupFunc()
+			
+			// Validate that input file was created
+			if _, err := os.Stat(inputFile); os.IsNotExist(err) {
+				t.Fatalf("Input file was not created: %s", inputFile)
+			}
 			
 			// Process the file
 			orchestrator := service.NewOrchestrator(cfg)
@@ -328,7 +358,10 @@ func TestComprehensiveScenarios(t *testing.T) {
 			runner.AddResult(testResult)
 			
 			if err != nil {
-				t.Fatalf("Scenario %s failed: %v", scenario.name, err)
+				t.Errorf("Scenario %s failed: %v", scenario.name, err)
+				t.Logf("Configuration: %+v", cfg)
+				t.Logf("Input file: %s", inputFile)
+				return // Skip validation if processing failed
 			}
 			
 			// Validate basic expectations

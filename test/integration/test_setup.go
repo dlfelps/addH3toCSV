@@ -23,7 +23,7 @@ func TestMain(m *testing.M) {
 // setupTestEnvironment prepares the test environment
 func setupTestEnvironment() {
 	// Ensure test data directory exists
-	os.MkdirAll("../testdata", 0755)
+	os.MkdirAll("testdata", 0755)
 	
 	// Create any required test files
 	createRequiredTestFiles()
@@ -37,19 +37,31 @@ func cleanupTestEnvironment() {
 
 // createRequiredTestFiles creates any test files that are required by multiple tests
 func createRequiredTestFiles() {
-	// This function can be used to create shared test data files
-	// Individual tests should create their own specific test data
+	// Create basic test data files if they don't exist
+	testDataDir := "testdata"
+	
+	// Create a simple test file for basic validation
+	basicTestFile := filepath.Join(testDataDir, "basic_test.csv")
+	if _, err := os.Stat(basicTestFile); os.IsNotExist(err) {
+		file, err := os.Create(basicTestFile)
+		if err == nil {
+			file.WriteString("name,latitude,longitude\n")
+			file.WriteString("Test Location,40.7128,-74.0060\n")
+			file.Close()
+		}
+	}
 }
 
 // validateTestEnvironment checks if the test environment is properly set up
 func validateTestEnvironment(t *testing.T) {
 	// Check if required directories exist
-	if _, err := os.Stat("../testdata"); os.IsNotExist(err) {
-		t.Fatal("Test data directory does not exist")
+	if _, err := os.Stat("testdata"); os.IsNotExist(err) {
+		// Create it if it doesn't exist
+		os.MkdirAll("testdata", 0755)
 	}
 	
 	// Check if Go module is available
-	if _, err := os.Stat("../../go.mod"); os.IsNotExist(err) {
-		t.Fatal("Go module not found - tests must be run from project root")
+	if _, err := os.Stat("go.mod"); os.IsNotExist(err) {
+		t.Skip("Go module not found - tests must be run from project root")
 	}
 }

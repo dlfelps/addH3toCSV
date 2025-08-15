@@ -2,7 +2,6 @@ package testutil
 
 import (
 	"os"
-	"path/filepath"
 	"testing"
 	"time"
 )

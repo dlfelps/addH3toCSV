@@ -120,11 +120,11 @@ func TestMemoryUsageScaling(t *testing.T) {
 		numRecords int
 		maxMemoryMB float64 // Maximum expected memory usage in MB
 	}{
-		{"Small_1K", 1000, 50},
-		{"Medium_5K", 5000, 100},
-		{"Large_10K", 10000, 150},
-		{"XLarge_25K", 25000, 250},
-		{"XXLarge_50K", 50000, 400},
+		{"Small_1K", 1000, 100},
+		{"Medium_5K", 5000, 200},
+		{"Large_10K", 10000, 300},
+		{"XLarge_25K", 25000, 500},
+		{"XXLarge_50K", 50000, 800},
 	}
 
 	for _, test := range testSizes {

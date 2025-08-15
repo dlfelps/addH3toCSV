@@ -467,6 +467,10 @@ func TestCLIIntegration(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// Save original args and restore after test
+			originalArgs := os.Args
+			defer func() { os.Args = originalArgs }()
+			
 			// Create CLI instance
 			cliApp := cli.NewCLI()
 			
@@ -480,6 +484,8 @@ func TestCLIIntegration(t *testing.T) {
 				t.Errorf("Expected error, but got none")
 			} else if !tt.wantErr && err != nil {
 				t.Errorf("Unexpected error: %v", err)
+				t.Logf("CLI args were: %v", tt.args)
+				return // Skip validation if CLI failed
 			}
 
 			if !tt.wantErr && tt.validate != nil {

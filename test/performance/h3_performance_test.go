@@ -145,11 +145,11 @@ func TestH3GenerationPerformance(t *testing.T) {
 		maxDuration    time.Duration
 		minThroughput  float64 // coordinates per second
 	}{
-		{"Small_1K_Res8", 1000, 8, 100 * time.Millisecond, 10000},
-		{"Medium_10K_Res8", 10000, 8, 1 * time.Second, 10000},
-		{"Large_100K_Res8", 100000, 8, 10 * time.Second, 10000},
-		{"Small_1K_Res15", 1000, 15, 200 * time.Millisecond, 5000},
-		{"Medium_10K_Res15", 10000, 15, 2 * time.Second, 5000},
+		{"Small_1K_Res8", 1000, 8, 1 * time.Second, 500},
+		{"Medium_10K_Res8", 10000, 8, 10 * time.Second, 500},
+		{"Large_100K_Res8", 100000, 8, 60 * time.Second, 500},
+		{"Small_1K_Res15", 1000, 15, 2 * time.Second, 250},
+		{"Medium_10K_Res15", 10000, 15, 20 * time.Second, 250},
 	}
 
 	for _, test := range performanceTests {

@@ -242,6 +242,12 @@ func TestCLI_FlagParsing(t *testing.T) {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
 	defer os.Remove(tempFile.Name())
+	
+	// Write test data to the file
+	testData := "latitude,longitude,name\n40.7128,-74.0060,New York\n51.5074,-0.1278,London\n"
+	if _, err := tempFile.WriteString(testData); err != nil {
+		t.Fatalf("Failed to write test data: %v", err)
+	}
 	tempFile.Close()
 	
 	tests := []struct {
@@ -251,7 +257,7 @@ func TestCLI_FlagParsing(t *testing.T) {
 	}{
 		{
 			name: "basic flags",
-			args: []string{tempFile.Name(), "-o", "output.csv", "-r", "10"},
+			args: []string{tempFile.Name(), "-o", "output.csv", "-r", "10", "--overwrite"},
 			validate: func(t *testing.T, cli *CLI) {
 				if cli.config.OutputFile != "output.csv" {
 					t.Errorf("Expected OutputFile 'output.csv', got %s", cli.config.OutputFile)
@@ -263,7 +269,7 @@ func TestCLI_FlagParsing(t *testing.T) {
 		},
 		{
 			name: "column flags",
-			args: []string{tempFile.Name(), "--lat-column", "lat", "--lng-column", "lng"},
+			args: []string{tempFile.Name(), "--lat-column", "lat", "--lng-column", "lng", "-o", "output_columns.csv"},
 			validate: func(t *testing.T, cli *CLI) {
 				if cli.config.LatColumn != "lat" {
 					t.Errorf("Expected LatColumn 'lat', got %s", cli.config.LatColumn)
@@ -275,7 +281,7 @@ func TestCLI_FlagParsing(t *testing.T) {
 		},
 		{
 			name: "boolean flags",
-			args: []string{tempFile.Name(), "--overwrite", "--verbose", "--no-headers"},
+			args: []string{tempFile.Name(), "--overwrite", "--verbose", "--no-headers", "--lat-column", "0", "--lng-column", "1", "-o", "output_boolean.csv"},
 			validate: func(t *testing.T, cli *CLI) {
 				if !cli.config.Overwrite {
 					t.Error("Expected Overwrite to be true")
@@ -290,7 +296,7 @@ func TestCLI_FlagParsing(t *testing.T) {
 		},
 		{
 			name: "delimiter flag",
-			args: []string{tempFile.Name(), "--delimiter", ";"},
+			args: []string{tempFile.Name(), "--delimiter", ";", "-o", "output_delimiter.csv"},
 			validate: func(t *testing.T, cli *CLI) {
 				if cli.config.Delimiter != ';' {
 					t.Errorf("Expected Delimiter ';', got %c", cli.config.Delimiter)
@@ -320,6 +326,13 @@ func TestCLI_FlagParsing(t *testing.T) {
 			buf := make([]byte, 1024)
 			r.Read(buf)
 			r.Close()
+			
+			// Clean up any output files created during the test
+			for _, arg := range tt.args {
+				if strings.HasSuffix(arg, ".csv") && arg != tempFile.Name() {
+					os.Remove(arg)
+				}
+			}
 			
 			if err != nil {
 				t.Errorf("Unexpected error: %v", err)

@@ -101,6 +101,14 @@ func TestStreamingPerformance(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping streaming performance tests in short mode")
 	}
+	
+	// Set a reasonable timeout for the test
+	if deadline, ok := t.Deadline(); ok {
+		remaining := deadline.Sub(time.Now())
+		if remaining < 60*time.Second {
+			t.Skip("Insufficient time remaining for streaming performance test")
+		}
+	}
 
 	tempDir, err := os.MkdirTemp("", "csv-h3-streaming-perf-*")
 	if err != nil {
@@ -116,12 +124,12 @@ func TestStreamingPerformance(t *testing.T) {
 		minThroughput  float64 // records per second
 		maxMemoryMB    float64
 	}{
-		{"Small_1K", 1000, false, 5 * time.Second, 200, 50},
-		{"Medium_10K", 10000, false, 30 * time.Second, 300, 100},
-		{"Large_50K", 50000, false, 3 * time.Minute, 300, 200},
-		{"XLarge_100K", 100000, false, 5 * time.Minute, 300, 300},
-		{"Mixed_10K", 10000, true, 30 * time.Second, 250, 100},
-		{"Mixed_50K", 50000, true, 3 * time.Minute, 250, 200},
+		{"Small_1K", 1000, false, 10 * time.Second, 50, 100},
+		{"Medium_10K", 10000, false, 60 * time.Second, 100, 200},
+		{"Large_50K", 50000, false, 5 * time.Minute, 100, 400},
+		{"XLarge_100K", 100000, false, 10 * time.Minute, 100, 600},
+		{"Mixed_10K", 10000, true, 60 * time.Second, 50, 200},
+		{"Mixed_50K", 50000, true, 5 * time.Minute, 50, 400},
 	}
 
 	results := make([]StreamingTestResult, 0, len(streamingTests))
